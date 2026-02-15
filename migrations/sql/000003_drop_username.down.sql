@@ -1,0 +1,3 @@
+ALTER TABLE users ADD COLUMN username VARCHAR(50);
+UPDATE users SET username = SUBSTRING(email FROM 1 FOR POSITION('@' IN email)-1);
+ALTER TABLE users ALTER COLUMN username SET NOT NULL;

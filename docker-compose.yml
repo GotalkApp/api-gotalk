@@ -1,0 +1,171 @@
+# ============================================
+# GoTalk - Docker Compose (Development)
+# ============================================
+# Shared network: "gotalk-network" allows FE project to connect
+# In FE's docker-compose.yml, add:
+#   networks:
+#     gotalk-network:
+#       external: true
+# ============================================
+
+services:
+  # ==================== Traefik (Reverse Proxy & Load Balancer) ====================
+  traefik:
+    image: traefik:v3.2
+    container_name: gotalk-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8080" # Traefik Dashboard at http://localhost:8090
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - gotalk-network
+    restart: unless-stopped
+
+  # ==================== GoTalk API (Go + Gin) ====================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: gotalk-api
+    env_file:
+      - .env
+    volumes:
+      - .:/app # Mount source code for hot reload
+      - go-modules:/go/pkg/mod # Cache Go modules
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    labels:
+      # Traefik routing configuration
+      - "traefik.enable=true"
+
+      # HTTP Router - matches api.localhost
+      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.services.api.loadbalancer.server.port=8080"
+
+      # WebSocket support
+      - "traefik.http.middlewares.api-headers.headers.customrequestheaders.Connection=keep-alive,Upgrade"
+      - "traefik.http.middlewares.api-headers.headers.customrequestheaders.Upgrade=websocket"
+    networks:
+      - gotalk-network
+    restart: unless-stopped
+
+  # ==================== PostgreSQL ====================
+  postgres:
+    image: postgres:16-alpine
+    container_name: gotalk-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-gotalk}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-gotalk_secret_2026}
+      POSTGRES_DB: ${DB_NAME:-gotalk}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-gotalk}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gotalk-network
+    restart: unless-stopped
+
+  # ==================== Redis ====================
+  redis:
+    image: redis:7-alpine
+    container_name: gotalk-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+    networks:
+      - gotalk-network
+    restart: unless-stopped
+
+  # ==================== Mailpit (Email Testing) ====================
+  # Captures all outgoing emails - perfect for development
+  # Web UI: http://localhost:8025 or http://mail.localhost
+  # SMTP: mailpit:1025 (no auth required)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: gotalk-mailpit
+    ports:
+      - "8025:8025" # Web UI
+      - "1025:1025" # SMTP
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailpit.rule=Host(`mail.localhost`)"
+      - "traefik.http.routers.mailpit.entrypoints=web"
+      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
+    networks:
+      - gotalk-network
+    restart: unless-stopped
+
+  # ==================== MinIO (S3-compatible storage) ====================
+  minio:
+    image: minio/minio:latest
+    container_name: gotalk-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-gotalk_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-gotalk_minio_secret}
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio.rule=Host(`storage.localhost`)"
+      - "traefik.http.routers.minio.entrypoints=web"
+      - "traefik.http.services.minio.loadbalancer.server.port=9000"
+    networks:
+      - gotalk-network
+    restart: unless-stopped
+
+# ==================== Volumes ====================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  go-modules:
+    driver: local
+
+# ==================== Networks ====================
+# External network so FE project can connect
+# Create it with: docker network create gotalk-network
+networks:
+  gotalk-network:
+    name: gotalk-network
+    driver: bridge
