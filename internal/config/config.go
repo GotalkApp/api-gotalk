@@ -71,6 +71,7 @@ type JWTConfig struct {
 
 type MinIOConfig struct {
 	Endpoint  string
+	PublicURL string
 	AccessKey string
 	SecretKey string
 	Bucket    string
@@ -131,6 +132,7 @@ func Load() *Config {
 		},
 		MinIO: MinIOConfig{
 			Endpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
+			PublicURL: getEnv("MINIO_PUBLIC_URL", ""),
 			AccessKey: getEnv("MINIO_ACCESS_KEY", "minioadmin"),
 			SecretKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
 			Bucket:    getEnv("MINIO_BUCKET", "gotalk-media"),

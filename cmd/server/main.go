@@ -21,6 +21,7 @@ import (
 	"github.com/quocanhngo/gotalk/migrations"
 	"github.com/quocanhngo/gotalk/pkg/auth"
 	"github.com/quocanhngo/gotalk/pkg/mailer"
+	"github.com/quocanhngo/gotalk/pkg/storage"
 	"github.com/redis/go-redis/v9"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -79,6 +80,7 @@ func main() {
 			&model.Conversation{},
 			&model.ConversationMember{},
 			&model.Message{},
+			&model.MessageAttachment{},
 			&model.ReadReceipt{},
 		); err != nil {
 			log.Fatalf("❌ Failed to migrate database: %v", err)
@@ -137,10 +139,27 @@ func main() {
 	defer hubCancel()
 	go hub.Run(hubCtx)
 
+	// MinIO Storage
+	minioStorage, err := storage.NewMinIO(storage.Config{
+		Endpoint:  cfg.MinIO.Endpoint,
+		PublicURL: cfg.MinIO.PublicURL,
+		AccessKey: cfg.MinIO.AccessKey,
+		SecretKey: cfg.MinIO.SecretKey,
+		Bucket:    cfg.MinIO.Bucket,
+		UseSSL:    cfg.MinIO.UseSSL,
+	})
+	if err != nil {
+		log.Printf("⚠️  MinIO not available: %v (file upload disabled)", err)
+	}
+	if minioStorage != nil {
+		log.Println("✅ Connected to MinIO")
+	}
+
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
 	chatHandler := handler.NewChatHandler(chatService, hub)
 	wsHandler := handler.NewWSHandler(hub, chatService, jwtManager)
+	uploadHandler := handler.NewUploadHandler(minioStorage)
 
 	// ==================== Gin Router ====================
 	if cfg.App.Env == "production" {
@@ -203,6 +222,10 @@ func main() {
 			protected.GET("/conversations/:id/messages", chatHandler.GetMessages)
 			protected.POST("/conversations/:id/messages", chatHandler.SendMessage)
 			protected.POST("/conversations/:id/read", chatHandler.MarkAsRead)
+
+			// Upload
+			protected.POST("/upload", uploadHandler.UploadFile)
+			protected.POST("/upload/multiple", uploadHandler.UploadMultiple)
 		}
 	}
 

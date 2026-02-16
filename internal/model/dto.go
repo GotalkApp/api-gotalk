@@ -65,7 +65,7 @@ type GoogleUserInfo struct {
 
 type CreateConversationRequest struct {
 	Type      ConversationType `json:"type" binding:"required,oneof=private group"`
-	Name      string           `json:"name"`                                          // required for group
+	Name      string           `json:"name"` // required for group
 	MemberIDs []uuid.UUID      `json:"member_ids" binding:"required,min=1"`
 }
 
@@ -87,12 +87,23 @@ type ConversationResponse struct {
 // ========== Message DTOs ==========
 
 type SendMessageRequest struct {
-	Content   string      `json:"content" binding:"required_without=FileURL"`
-	Type      MessageType `json:"type"`
-	FileURL   string      `json:"file_url"`
-	FileName  string      `json:"file_name"`
-	FileSize  int64       `json:"file_size"`
-	ReplyToID *uuid.UUID  `json:"reply_to_id"`
+	Content     string            `json:"content" binding:"required_without_all=Attachments FileURL"`
+	Type        MessageType       `json:"type"`
+	ReplyToID   *uuid.UUID        `json:"reply_to_id"`
+	Attachments []AttachmentInput `json:"attachments,omitempty"`
+	// Legacy single-file fields (backward compatible)
+	FileURL  string `json:"file_url,omitempty"`
+	FileName string `json:"file_name,omitempty"`
+	FileSize int64  `json:"file_size,omitempty"`
+}
+
+// AttachmentInput is used when sending a message with attachments
+type AttachmentInput struct {
+	URL      string         `json:"url" binding:"required"`
+	Type     AttachmentType `json:"type" binding:"required"`
+	FileName string         `json:"file_name"`
+	FileSize int64          `json:"file_size"`
+	MimeType string         `json:"mime_type"`
 }
 
 type MessageListRequest struct {
@@ -109,16 +120,16 @@ type WSEvent struct {
 
 // WebSocket event types
 const (
-	WSEventNewMessage    = "new_message"
-	WSEventTyping        = "typing"
-	WSEventStopTyping    = "stop_typing"
-	WSEventOnline        = "online"
-	WSEventOffline       = "offline"
-	WSEventMessageRead   = "message_read"
-	WSEventCallOffer     = "call_offer"
-	WSEventCallAnswer    = "call_answer"
-	WSEventCallICE       = "call_ice_candidate"
-	WSEventCallHangup    = "call_hangup"
+	WSEventNewMessage  = "new_message"
+	WSEventTyping      = "typing"
+	WSEventStopTyping  = "stop_typing"
+	WSEventOnline      = "online"
+	WSEventOffline     = "offline"
+	WSEventMessageRead = "message_read"
+	WSEventCallOffer   = "call_offer"
+	WSEventCallAnswer  = "call_answer"
+	WSEventCallICE     = "call_ice_candidate"
+	WSEventCallHangup  = "call_hangup"
 )
 
 type TypingEvent struct {

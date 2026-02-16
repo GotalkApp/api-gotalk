@@ -13,7 +13,9 @@ type MessageType string
 const (
 	MessageTypeText  MessageType = "text"
 	MessageTypeImage MessageType = "image"
+	MessageTypeVideo MessageType = "video"
 	MessageTypeFile  MessageType = "file"
+	MessageTypeAudio MessageType = "audio"
 )
 
 // MessageStatus defines the delivery status of a message
@@ -42,10 +44,11 @@ type Message struct {
 	DeletedAt      gorm.DeletedAt `json:"-" gorm:"index"`
 
 	// Relations
-	Sender       User          `json:"sender" gorm:"foreignKey:SenderID"`
-	Conversation Conversation  `json:"-" gorm:"foreignKey:ConversationID"`
-	ReplyTo      *Message      `json:"reply_to,omitempty" gorm:"foreignKey:ReplyToID"`
-	ReadReceipts []ReadReceipt `json:"read_receipts,omitempty" gorm:"foreignKey:MessageID"`
+	Sender       User                `json:"sender" gorm:"foreignKey:SenderID"`
+	Conversation Conversation        `json:"-" gorm:"foreignKey:ConversationID"`
+	ReplyTo      *Message            `json:"reply_to,omitempty" gorm:"foreignKey:ReplyToID"`
+	ReadReceipts []ReadReceipt       `json:"read_receipts,omitempty" gorm:"foreignKey:MessageID"`
+	Attachments  []MessageAttachment `json:"attachments,omitempty" gorm:"foreignKey:MessageID"`
 }
 
 // ReadReceipt tracks when a user reads a message

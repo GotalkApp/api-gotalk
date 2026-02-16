@@ -212,6 +212,12 @@ func (s *ChatService) SendMessage(senderID, convID uuid.UUID, req model.SendMess
 	msgType := req.Type
 	if msgType == "" {
 		msgType = model.MessageTypeText
+		// Auto-detect type from attachments
+		if len(req.Attachments) > 0 {
+			msgType = model.MessageType(req.Attachments[0].Type)
+		} else if req.FileURL != "" {
+			msgType = model.MessageTypeFile
+		}
 	}
 
 	msg := &model.Message{
@@ -230,10 +236,25 @@ func (s *ChatService) SendMessage(senderID, convID uuid.UUID, req model.SendMess
 		return nil, errors.New("failed to send message")
 	}
 
+	// Save attachments if any
+	if len(req.Attachments) > 0 {
+		for _, att := range req.Attachments {
+			attachment := model.MessageAttachment{
+				MessageID: msg.ID,
+				Type:      att.Type,
+				URL:       att.URL,
+				FileName:  att.FileName,
+				FileSize:  att.FileSize,
+				MimeType:  att.MimeType,
+			}
+			s.msgRepo.CreateAttachment(&attachment)
+		}
+	}
+
 	// Update conversation's updated_at for sorting
 	_ = s.convRepo.TouchUpdatedAt(convID)
 
-	// Reload with sender info
+	// Reload with sender info and attachments
 	return s.msgRepo.FindByID(msg.ID)
 }
 

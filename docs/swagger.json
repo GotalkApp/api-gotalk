@@ -444,6 +444,84 @@
                     }
                 }
             }
+        },
+        "/upload": {
+            "post": {
+                "summary": "Upload File",
+                "description": "Upload a file (image, video, or document). Returns public URL.",
+                "tags": [
+                    "Upload"
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "formData",
+                        "name": "file",
+                        "type": "file",
+                        "description": "File to upload",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upload success",
+                        "schema": {
+                            "$ref": "#/definitions/UploadResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/upload/multiple": {
+            "post": {
+                "summary": "Upload Multiple Files",
+                "description": "Upload up to 10 files.",
+                "tags": [
+                    "Upload"
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "formData",
+                        "name": "files",
+                        "type": "file",
+                        "description": "Files to upload",
+                        "required": true,
+                        "allowMultiple": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upload success",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/UploadResponse"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -531,10 +609,10 @@
         "DirectConversationRequest": {
             "type": "object",
             "required": [
-                "partner_id"
+                "receiver_id"
             ],
             "properties": {
-                "partner_id": {
+                "receiver_id": {
                     "type": "string"
                 }
             }
@@ -564,18 +642,16 @@
                 },
                 "type": {
                     "type": "string",
-                    "enum": [
-                        "text",
-                        "image",
-                        "file"
-                    ],
-                    "default": "text"
-                },
-                "file_url": {
-                    "type": "string"
+                    "description": "Auto-detected if empty"
                 },
                 "reply_to_id": {
                     "type": "string"
+                },
+                "attachments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AttachmentInput"
+                    }
                 }
             }
         },
@@ -688,6 +764,89 @@
                 "created_at": {
                     "type": "string",
                     "format": "date-time"
+                },
+                "attachments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MessageAttachment"
+                    }
+                }
+            }
+        },
+        "AttachmentInput": {
+            "type": "object",
+            "required": [
+                "url",
+                "type"
+            ],
+            "properties": {
+                "url": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "file_name": {
+                    "type": "string"
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "mime_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "MessageAttachment": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "file_name": {
+                    "type": "string"
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "width": {
+                    "type": "integer"
+                },
+                "height": {
+                    "type": "integer"
+                },
+                "duration": {
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        },
+        "UploadResponse": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
+                },
+                "file_name": {
+                    "type": "string"
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "mime_type": {
+                    "type": "string"
                 }
             }
         }

@@ -25,6 +25,7 @@ func (r *MessageRepository) FindByID(id uuid.UUID) (*model.Message, error) {
 	var msg model.Message
 	err := r.db.
 		Preload("Sender").
+		Preload("Attachments").
 		Where("id = ?", id).
 		First(&msg).Error
 	if err != nil {
@@ -38,6 +39,7 @@ func (r *MessageRepository) GetConversationMessages(conversationID uuid.UUID, be
 	messages := []model.Message{}
 	query := r.db.
 		Preload("Sender").
+		Preload("Attachments").
 		Where("conversation_id = ?", conversationID).
 		Order("created_at DESC").
 		Limit(limit)
@@ -72,7 +74,7 @@ func (r *MessageRepository) GetLastMessage(conversationID uuid.UUID) (*model.Mes
 // GetUnreadMessages returns unread messages for a user in a conversation
 func (r *MessageRepository) GetUnreadMessages(conversationID, userID uuid.UUID) ([]model.Message, error) {
 	messages := []model.Message{}
-	
+
 	subQuery := r.db.Table("conversation_members").
 		Select("COALESCE(last_read_at, '0001-01-01')").
 		Where("conversation_id = ? AND user_id = ?", conversationID, userID)
@@ -85,8 +87,6 @@ func (r *MessageRepository) GetUnreadMessages(conversationID, userID uuid.UUID) 
 		Find(&messages).Error
 	return messages, err
 }
-
-
 
 // CountUnread counts unread messages for a user in a conversation
 func (r *MessageRepository) CountUnread(conversationID, userID uuid.UUID) (int64, error) {
@@ -101,4 +101,9 @@ func (r *MessageRepository) CountUnread(conversationID, userID uuid.UUID) (int64
 		Where("created_at > (?)", subQuery).
 		Count(&count).Error
 	return count, err
+}
+
+// CreateAttachment inserts a new message attachment
+func (r *MessageRepository) CreateAttachment(att *model.MessageAttachment) error {
+	return r.db.Create(att).Error
 }
