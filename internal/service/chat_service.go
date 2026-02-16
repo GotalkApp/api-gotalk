@@ -1,30 +1,35 @@
 package service
 
 import (
+	"context"
 	"errors"
 
 	"github.com/google/uuid"
 	"github.com/quocanhngo/gotalk/internal/model"
 	"github.com/quocanhngo/gotalk/internal/repository"
+	"github.com/quocanhngo/gotalk/pkg/notification"
 	"gorm.io/gorm"
 )
 
 // ChatService handles chat business logic
 type ChatService struct {
-	convRepo *repository.ConversationRepository
-	msgRepo  *repository.MessageRepository
-	userRepo *repository.UserRepository
+	convRepo     *repository.ConversationRepository
+	msgRepo      *repository.MessageRepository
+	userRepo     *repository.UserRepository
+	notifService *notification.NotificationService
 }
 
 func NewChatService(
 	convRepo *repository.ConversationRepository,
 	msgRepo *repository.MessageRepository,
 	userRepo *repository.UserRepository,
+	notifService *notification.NotificationService,
 ) *ChatService {
 	return &ChatService{
-		convRepo: convRepo,
-		msgRepo:  msgRepo,
-		userRepo: userRepo,
+		convRepo:     convRepo,
+		msgRepo:      msgRepo,
+		userRepo:     userRepo,
+		notifService: notifService,
 	}
 }
 
@@ -253,6 +258,22 @@ func (s *ChatService) SendMessage(senderID, convID uuid.UUID, req model.SendMess
 
 	// Update conversation's updated_at for sorting
 	_ = s.convRepo.TouchUpdatedAt(convID)
+
+	// Send Push Notification
+	go func() {
+		ctx := context.Background()
+		sender, err := s.userRepo.FindByID(senderID)
+		if err != nil {
+			return
+		}
+
+		memberIDs, _ := s.convRepo.GetMemberIDs(convID)
+		for _, memberID := range memberIDs {
+			if memberID != senderID {
+				_ = s.notifService.SendMessageNotification(ctx, memberID, sender.Name, req.Content, convID)
+			}
+		}
+	}()
 
 	// Reload with sender info and attachments
 	return s.msgRepo.FindByID(msg.ID)

@@ -61,6 +61,23 @@ type GoogleUserInfo struct {
 	Verified bool   `json:"email_verified"`
 }
 
+type UpdateProfileRequest struct {
+	Name   string `json:"name" binding:"max=100"`
+	Avatar string `json:"avatar" binding:"max=500"`
+}
+
+type UpdateSettingsRequest struct {
+	Theme                 string `json:"theme" binding:"omitempty,oneof=light dark system"`
+	IsNotificationEnabled *bool  `json:"is_notification_enabled"`
+	IsSoundEnabled        *bool  `json:"is_sound_enabled"`
+	Language              string `json:"language" binding:"omitempty,len=2"`
+}
+
+type RegisterDeviceRequest struct {
+	FCMToken   string `json:"fcm_token" binding:"required"`
+	DeviceType string `json:"device_type" binding:"required"`
+}
+
 // ========== Conversation DTOs ==========
 
 type CreateConversationRequest struct {

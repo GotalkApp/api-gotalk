@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS user_devices;
+ALTER TABLE users DROP COLUMN IF EXISTS theme;
+ALTER TABLE users DROP COLUMN IF EXISTS is_notification_enabled;
+ALTER TABLE users DROP COLUMN IF EXISTS language;

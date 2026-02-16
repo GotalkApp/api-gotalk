@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quocanhngo/gotalk/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // UserRepository handles database operations for User
@@ -93,4 +94,59 @@ func (r *UserRepository) UpdateAvatar(userID uuid.UUID, avatarURL string) error 
 	return r.db.Model(&model.User{}).
 		Where("id = ?", userID).
 		Update("avatar", avatarURL).Error
+}
+
+// UpdateProfile updates user's name and/or avatar
+func (r *UserRepository) UpdateProfile(userID uuid.UUID, name, avatar string) error {
+	updates := map[string]interface{}{}
+	if name != "" {
+		updates["name"] = name
+	}
+	if avatar != "" {
+		updates["avatar"] = avatar
+	}
+	return r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error
+}
+
+// UpdateSettings updates user settings
+func (r *UserRepository) UpdateSettings(userID uuid.UUID, theme string, notifEnabled *bool, soundEnabled *bool, lang string) error {
+	updates := map[string]interface{}{}
+	if theme != "" {
+		updates["theme"] = theme
+	}
+	if notifEnabled != nil {
+		updates["is_notification_enabled"] = *notifEnabled
+	}
+	if soundEnabled != nil {
+		updates["is_sound_enabled"] = *soundEnabled
+	}
+	if lang != "" {
+		updates["language"] = lang
+	}
+	return r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error
+}
+
+// AddDevice adds or updates a device token
+func (r *UserRepository) AddDevice(userID uuid.UUID, token string, deviceType string) error {
+	device := model.UserDevice{
+		UserID:       userID,
+		FCMToken:     token,
+		DeviceType:   deviceType,
+		LastActiveAt: time.Now(),
+	}
+	// Upsert: on conflict do update
+	return r.db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "user_id"}, {Name: "fcm_token"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"last_active_at": time.Now(),
+			"device_type":    deviceType,
+		}),
+	}).Create(&device).Error
+}
+
+// GetUserDevices gets all devices for a user
+func (r *UserRepository) GetUserDevices(userID uuid.UUID) ([]model.UserDevice, error) {
+	var devices []model.UserDevice
+	err := r.db.Where("user_id = ?", userID).Find(&devices).Error
+	return devices, err
 }

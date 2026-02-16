@@ -24,7 +24,7 @@ import (
 const (
 	otpLength        = 6
 	otpExpiryMinutes = 5
-	otpRateLimit     = 3               // max OTPs per hour
+	otpRateLimit     = 3 // max OTPs per hour
 	googleTokenURL   = "https://oauth2.googleapis.com/tokeninfo?id_token="
 )
 
@@ -318,6 +318,27 @@ func (s *AuthService) SearchUsers(query string, excludeUserID uuid.UUID) ([]mode
 		result = append(result, u.ToResponse())
 	}
 	return result, nil
+}
+
+// UpdateProfile updates user's profile
+func (s *AuthService) UpdateProfile(userID uuid.UUID, req model.UpdateProfileRequest) (*model.UserResponse, error) {
+	if err := s.userRepo.UpdateProfile(userID, req.Name, req.Avatar); err != nil {
+		return nil, err
+	}
+	return s.GetProfile(userID)
+}
+
+// UpdateSettings updates user's settings
+func (s *AuthService) UpdateSettings(userID uuid.UUID, req model.UpdateSettingsRequest) (*model.UserResponse, error) {
+	if err := s.userRepo.UpdateSettings(userID, req.Theme, req.IsNotificationEnabled, req.IsSoundEnabled, req.Language); err != nil {
+		return nil, err
+	}
+	return s.GetProfile(userID)
+}
+
+// RegisterDevice registers a new device for push notifications
+func (s *AuthService) RegisterDevice(userID uuid.UUID, req model.RegisterDeviceRequest) error {
+	return s.userRepo.AddDevice(userID, req.FCMToken, req.DeviceType)
 }
 
 // Logout invalidates the token and sets user offline

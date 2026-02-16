@@ -11,14 +11,15 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	App    AppConfig
-	DB     DBConfig
-	Redis  RedisConfig
-	JWT    JWTConfig
-	MinIO  MinIOConfig
-	CORS   CORSConfig
-	SMTP   SMTPConfig
-	Google GoogleConfig
+	App      AppConfig
+	DB       DBConfig
+	Redis    RedisConfig
+	JWT      JWTConfig
+	MinIO    MinIOConfig
+	CORS     CORSConfig
+	SMTP     SMTPConfig
+	Google   GoogleConfig
+	Firebase FirebaseConfig
 }
 
 type AppConfig struct {
@@ -96,6 +97,10 @@ type GoogleConfig struct {
 	ClientSecret string
 }
 
+type FirebaseConfig struct {
+	CredentialsFile string
+}
+
 // Load reads configuration from .env file and environment variables
 func Load() *Config {
 	// Load .env file (ignore error if not exists - e.g. in Docker)
@@ -152,6 +157,9 @@ func Load() *Config {
 		Google: GoogleConfig{
 			ClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 			ClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
+		},
+		Firebase: FirebaseConfig{
+			CredentialsFile: getEnv("FIREBASE_CREDENTIALS_FILE", "firebase-adminsdk.json"),
 		},
 	}
 }

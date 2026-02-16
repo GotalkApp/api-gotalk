@@ -21,6 +21,7 @@ import (
 	"github.com/quocanhngo/gotalk/migrations"
 	"github.com/quocanhngo/gotalk/pkg/auth"
 	"github.com/quocanhngo/gotalk/pkg/mailer"
+	"github.com/quocanhngo/gotalk/pkg/notification"
 	"github.com/quocanhngo/gotalk/pkg/storage"
 	"github.com/redis/go-redis/v9"
 	swaggerFiles "github.com/swaggo/files"
@@ -123,9 +124,15 @@ func main() {
 	msgRepo := repository.NewMessageRepository(db)
 
 	// Services
-	// Services
 	authService := service.NewAuthService(userRepo, otpRepo, jwtManager, mailClient, rdb, cfg.Google.ClientID)
-	chatService := service.NewChatService(convRepo, msgRepo, userRepo)
+
+	// Notification Service
+	notifService, err := notification.NewNotificationService(cfg.Firebase.CredentialsFile, userRepo)
+	if err != nil {
+		log.Printf("⚠️ Notification service error: %v", err)
+	}
+
+	chatService := service.NewChatService(convRepo, msgRepo, userRepo, notifService)
 
 	// WebSocket Hub (with Redis Pub/Sub for horizontal scaling)
 	hub := ws.NewHub(rdb, func(userID uuid.UUID, online bool) {
@@ -156,7 +163,7 @@ func main() {
 	}
 
 	// Handlers
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, minioStorage)
 	chatHandler := handler.NewChatHandler(chatService, hub)
 	wsHandler := handler.NewWSHandler(hub, chatService, jwtManager)
 	uploadHandler := handler.NewUploadHandler(minioStorage)
@@ -210,6 +217,10 @@ func main() {
 			// Auth
 			protected.POST("/auth/logout", authHandler.Logout)
 			protected.GET("/auth/profile", authHandler.GetProfile)
+			protected.PUT("/auth/profile", authHandler.UpdateProfile)
+			protected.GET("/auth/settings", authHandler.GetSettings)
+			protected.PUT("/auth/settings", authHandler.UpdateSettings)
+			protected.POST("/auth/device", authHandler.RegisterDevice)
 			protected.GET("/users/search", authHandler.SearchUsers)
 
 			// Conversations

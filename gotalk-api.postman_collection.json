@@ -25,8 +25,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/register",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "register"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
 						}
 					},
 					"response": []
@@ -47,8 +52,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/verify-otp",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "verify-otp"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"verify-otp"
+							]
 						}
 					},
 					"event": [
@@ -83,8 +93,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/login",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "login"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
 						}
 					},
 					"event": [
@@ -110,8 +125,108 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/auth/profile",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "profile"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "Updated Name",
+									"type": "text"
+								},
+								{
+									"key": "avatar",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/profile",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Settings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Settings",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"theme\": \"dark\",\n    \"is_notification_enabled\": true,\n    \"is_sound_enabled\": true,\n    \"language\": \"vi\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Register Device",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"fcm_token\": \"fcm-token-example\",\n    \"device_type\": \"web\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/device",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"device"
+							]
 						}
 					},
 					"response": []
@@ -128,8 +243,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/users/search?q=test",
-							"host": ["{{base_url}}"],
-							"path": ["users", "search"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"users",
+								"search"
+							],
 							"query": [
 								{
 									"key": "q",
@@ -152,8 +272,12 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/conversations",
-							"host": ["{{base_url}}"],
-							"path": ["conversations"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations"
+							]
 						}
 					},
 					"response": []
@@ -174,8 +298,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/conversations",
-							"host": ["{{base_url}}"],
-							"path": ["conversations"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations"
+							]
 						}
 					},
 					"response": []
@@ -196,8 +324,12 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/conversations",
-							"host": ["{{base_url}}"],
-							"path": ["conversations"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations"
+							]
 						}
 					},
 					"response": []
@@ -214,8 +346,14 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/conversations/:conv_id/messages?limit=50",
-							"host": ["{{base_url}}"],
-							"path": ["conversations", ":conv_id", "messages"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations",
+								":conv_id",
+								"messages"
+							],
 							"query": [
 								{
 									"key": "limit",
@@ -253,8 +391,14 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/conversations/:conv_id/messages",
-							"host": ["{{base_url}}"],
-							"path": ["conversations", ":conv_id", "messages"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations",
+								":conv_id",
+								"messages"
+							],
 							"variable": [
 								{
 									"key": "conv_id",
@@ -272,8 +416,14 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/conversations/:conv_id/read",
-							"host": ["{{base_url}}"],
-							"path": ["conversations", ":conv_id", "read"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"conversations",
+								":conv_id",
+								"read"
+							],
 							"variable": [
 								{
 									"key": "conv_id",
@@ -302,14 +452,18 @@
 			"listen": "prerequest",
 			"script": {
 				"type": "text/javascript",
-				"exec": [""]
+				"exec": [
+					""
+				]
 			}
 		},
 		{
 			"listen": "test",
 			"script": {
 				"type": "text/javascript",
-				"exec": [""]
+				"exec": [
+					""
+				]
 			}
 		}
 	],

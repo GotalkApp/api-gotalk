@@ -208,6 +208,177 @@
                         }
                     }
                 }
+            },
+            "put": {
+                "summary": "Update Profile",
+                "description": "Update user profile with optional avatar upload.",
+                "tags": [
+                    "Auth"
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "formData",
+                        "name": "name",
+                        "type": "string",
+                        "description": "User name"
+                    },
+                    {
+                        "in": "formData",
+                        "name": "avatar",
+                        "type": "file",
+                        "description": "Avatar image file"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User profile",
+                        "schema": {
+                            "$ref": "#/definitions/UserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/settings": {
+            "get": {
+                "summary": "Get User Settings",
+                "description": "Get current user settings.",
+                "tags": [
+                    "Auth"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User settings",
+                        "schema": {
+                            "$ref": "#/definitions/UserResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update User Settings",
+                "description": "Update user settings.",
+                "tags": [
+                    "Auth"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "Update settings request",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UpdateSettingsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User settings",
+                        "schema": {
+                            "$ref": "#/definitions/UserResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/device": {
+            "post": {
+                "summary": "Register Device",
+                "description": "Register device for push notifications.",
+                "tags": [
+                    "Auth"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "Register device request",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/RegisterDeviceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/users/search": {
@@ -698,6 +869,18 @@
                 "last_seen": {
                     "type": "string",
                     "format": "date-time"
+                },
+                "theme": {
+                    "type": "string"
+                },
+                "is_notification_enabled": {
+                    "type": "boolean"
+                },
+                "is_sound_enabled": {
+                    "type": "boolean"
+                },
+                "language": {
+                    "type": "string"
                 }
             }
         },
@@ -846,6 +1029,54 @@
                     "type": "integer"
                 },
                 "mime_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "UpdateProfileRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "avatar": {
+                    "type": "string"
+                }
+            }
+        },
+        "UpdateSettingsRequest": {
+            "type": "object",
+            "properties": {
+                "theme": {
+                    "type": "string",
+                    "enum": [
+                        "light",
+                        "dark",
+                        "system"
+                    ]
+                },
+                "is_notification_enabled": {
+                    "type": "boolean"
+                },
+                "is_sound_enabled": {
+                    "type": "boolean"
+                },
+                "language": {
+                    "type": "string"
+                }
+            }
+        },
+        "RegisterDeviceRequest": {
+            "type": "object",
+            "required": [
+                "fcm_token",
+                "device_type"
+            ],
+            "properties": {
+                "fcm_token": {
+                    "type": "string"
+                },
+                "device_type": {
                     "type": "string"
                 }
             }
