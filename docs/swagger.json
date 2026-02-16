@@ -96,7 +96,7 @@
                     "200": {
                         "description": "Verification successful",
                         "schema": {
-                            "$ref": "#/definitions/AuthResponse"
+                            "$ref": "#/definitions/LoginResponse"
                         }
                     },
                     "400": {
@@ -136,7 +136,47 @@
                     "200": {
                         "description": "Login successful",
                         "schema": {
-                            "$ref": "#/definitions/AuthResponse"
+                            "$ref": "#/definitions/LoginResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/google": {
+            "post": {
+                "summary": "Google Login",
+                "description": "Login with Google ID Token.",
+                "tags": [
+                    "Auth"
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "Google Login request",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/GoogleLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful",
+                        "schema": {
+                            "$ref": "#/definitions/LoginResponse"
                         }
                     },
                     "401": {
@@ -826,7 +866,18 @@
                 }
             }
         },
-        "AuthResponse": {
+        "GoogleLoginRequest": {
+            "type": "object",
+            "required": [
+                "id_token"
+            ],
+            "properties": {
+                "id_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "LoginResponse": {
             "type": "object",
             "properties": {
                 "token": {

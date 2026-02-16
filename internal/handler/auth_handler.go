@@ -130,7 +130,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body model.GoogleLoginRequest true "Google login request"
-// @Success 200 {object} model.AuthResponse
+// @Success 200 {object} model.LoginResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Router /auth/google [post]
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
@@ -140,7 +140,7 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.authService.GoogleLogin(req)
+	resp, err := h.authService.LoginWithGoogle(req)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, model.ErrorResponse{Error: err.Error()})
 		return

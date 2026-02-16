@@ -150,3 +150,70 @@ func (r *UserRepository) GetUserDevices(userID uuid.UUID) ([]model.UserDevice, e
 	err := r.db.Where("user_id = ?", userID).Find(&devices).Error
 	return devices, err
 }
+
+// GetOrCreateGoogleUser finds a user by email/google_id or creates a new one
+func (r *UserRepository) GetOrCreateGoogleUser(userInfo model.GoogleUserInfo) (*model.User, error) {
+	var user model.User
+
+	// Check by email first
+	if err := r.db.Where("email = ?", userInfo.Email).First(&user).Error; err == nil {
+		// User exists
+		updates := map[string]interface{}{}
+
+		// If GoogleID is missing, update it
+		if user.GoogleID == nil {
+			id := userInfo.GoogleID
+			updates["google_id"] = &id
+			updates["auth_provider"] = "google"
+
+			// Mark email as verified if not
+			if !user.IsEmailVerified() && userInfo.Verified {
+				now := time.Now()
+				updates["email_verified_at"] = &now
+			}
+		} else if *user.GoogleID != userInfo.GoogleID {
+			// Update GoogleID if different? usually shouldn't happen for same email
+			id := userInfo.GoogleID
+			updates["google_id"] = &id
+		}
+
+		// Update avatar if missing or empty
+		if user.Avatar == "" && userInfo.Picture != "" {
+			updates["avatar"] = userInfo.Picture
+		}
+
+		if len(updates) > 0 {
+			if err := r.db.Model(&user).Updates(updates).Error; err != nil {
+				return nil, err
+			}
+		}
+		return &user, nil
+	}
+
+	// User not found, create new one
+	googleID := userInfo.GoogleID
+
+	now := time.Now()
+	verifiedAt := &now
+	if !userInfo.Verified {
+		verifiedAt = nil
+	}
+
+	newUser := model.User{
+		Email:                 userInfo.Email,
+		Name:                  userInfo.Name,
+		Avatar:                userInfo.Picture,
+		GoogleID:              &googleID,
+		AuthProvider:          "google",
+		EmailVerifiedAt:       verifiedAt,
+		Theme:                 "system",
+		IsNotificationEnabled: true,
+		Language:              "vi",
+	}
+
+	if err := r.db.Create(&newUser).Error; err != nil {
+		return nil, err
+	}
+
+	return &newUser, nil
+}

@@ -3,12 +3,9 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +15,7 @@ import (
 	"github.com/quocanhngo/gotalk/pkg/mailer"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/api/idtoken"
 	"gorm.io/gorm"
 )
 
@@ -93,7 +91,7 @@ func (s *AuthService) Register(req model.RegisterRequest) (*model.OTPSentRespons
 }
 
 // VerifyOTP verifies an OTP code and activates the account
-func (s *AuthService) VerifyOTP(req model.VerifyOTPRequest) (*model.AuthResponse, error) {
+func (s *AuthService) VerifyOTP(req model.VerifyOTPRequest) (*model.LoginResponse, error) {
 	user, err := s.userRepo.FindByEmail(req.Email)
 	if err != nil {
 		return nil, errors.New("user not found")
@@ -124,7 +122,7 @@ func (s *AuthService) VerifyOTP(req model.VerifyOTPRequest) (*model.AuthResponse
 	// Refresh user data
 	user, _ = s.userRepo.FindByID(user.ID)
 
-	return &model.AuthResponse{
+	return &model.LoginResponse{
 		Token: token,
 		User:  user.ToResponse(),
 	}, nil
@@ -147,7 +145,7 @@ func (s *AuthService) ResendOTP(req model.ResendOTPRequest) (*model.OTPSentRespo
 // ==================== Login (Email/Password) ====================
 
 // Login authenticates a user and returns a JWT token
-func (s *AuthService) Login(req model.LoginRequest) (*model.AuthResponse, error) {
+func (s *AuthService) Login(req model.LoginRequest) (*model.LoginResponse, error) {
 	user, err := s.userRepo.FindByEmail(req.Email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -177,74 +175,13 @@ func (s *AuthService) Login(req model.LoginRequest) (*model.AuthResponse, error)
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &model.AuthResponse{
+	return &model.LoginResponse{
 		Token: token,
 		User:  user.ToResponse(),
 	}, nil
 }
 
 // ==================== Login (Google OAuth2) ====================
-
-// GoogleLogin authenticates via Google ID token
-func (s *AuthService) GoogleLogin(req model.GoogleLoginRequest) (*model.AuthResponse, error) {
-	// Verify Google ID token
-	googleUser, err := s.verifyGoogleToken(req.IDToken)
-	if err != nil {
-		return nil, fmt.Errorf("invalid Google token: %w", err)
-	}
-
-	// Check if user exists with this Google ID
-	user, err := s.userRepo.FindByGoogleID(googleUser.GoogleID)
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("failed to find user")
-		}
-
-		// Check if email is already registered (with email provider)
-		existingUser, err := s.userRepo.FindByEmail(googleUser.Email)
-		if err == nil {
-			// Link Google ID to existing account
-			existingUser.GoogleID = &googleUser.GoogleID
-			existingUser.Name = googleUser.Name // Update name from Google
-			existingUser.AuthProvider = model.AuthProviderGoogle
-			if existingUser.Avatar == "" && googleUser.Picture != "" {
-				existingUser.Avatar = googleUser.Picture
-			}
-			now := time.Now()
-			existingUser.EmailVerifiedAt = &now
-			if err := s.userRepo.Create(existingUser); err != nil {
-				// Update instead
-				s.userRepo.VerifyEmail(existingUser.ID)
-			}
-			user = existingUser
-		} else {
-			// Create new user from Google info
-			now := time.Now()
-			user = &model.User{
-				Name:            googleUser.Name,
-				Email:           googleUser.Email,
-				Avatar:          googleUser.Picture,
-				AuthProvider:    model.AuthProviderGoogle,
-				GoogleID:        &googleUser.GoogleID,
-				EmailVerifiedAt: &now, // Google emails are pre-verified
-			}
-			if err := s.userRepo.Create(user); err != nil {
-				return nil, errors.New("failed to create user")
-			}
-		}
-	}
-
-	// Generate JWT token
-	token, err := s.jwtManager.GenerateToken(user.ID, user.Email, user.Name)
-	if err != nil {
-		return nil, errors.New("failed to generate token")
-	}
-
-	return &model.AuthResponse{
-		Token: token,
-		User:  user.ToResponse(),
-	}, nil
-}
 
 // ==================== Forgot/Reset Password ====================
 
@@ -430,41 +367,60 @@ func generateOTPCode(length int) (string, error) {
 }
 
 // verifyGoogleToken validates a Google ID token and extracts user info
-func (s *AuthService) verifyGoogleToken(idToken string) (*model.GoogleUserInfo, error) {
-	resp, err := http.Get(googleTokenURL + idToken)
+func (s *AuthService) verifyGoogleToken(tokenString string) (*model.GoogleUserInfo, error) {
+	// Using the official Google library to validate the token
+	payload, err := idtoken.Validate(context.Background(), tokenString, s.googleClientID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify token: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Google token verification failed: %s", string(body))
+		return nil, fmt.Errorf("invalid google token: %w", err)
 	}
 
-	var tokenInfo struct {
-		Aud           string `json:"aud"`
-		Sub           string `json:"sub"`
-		Email         string `json:"email"`
-		EmailVerified string `json:"email_verified"`
-		Name          string `json:"name"`
-		Picture       string `json:"picture"`
+	// Extract claims
+	claims := payload.Claims
+
+	email, ok := claims["email"].(string)
+	if !ok {
+		return nil, errors.New("email not found in token")
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&tokenInfo); err != nil {
-		return nil, fmt.Errorf("failed to parse token info: %w", err)
-	}
-
-	// Verify the token was issued for our app
-	if s.googleClientID != "" && tokenInfo.Aud != s.googleClientID {
-		return nil, errors.New("token was not issued for this application")
-	}
+	name, _ := claims["name"].(string)
+	picture, _ := claims["picture"].(string)
+	verified, _ := claims["email_verified"].(bool)
+	sub := payload.Subject // Google User ID
 
 	return &model.GoogleUserInfo{
-		GoogleID: tokenInfo.Sub,
-		Email:    tokenInfo.Email,
-		Name:     tokenInfo.Name,
-		Picture:  tokenInfo.Picture,
-		Verified: tokenInfo.EmailVerified == "true",
+		GoogleID: sub,
+		Email:    email,
+		Name:     name,
+		Picture:  picture,
+		Verified: verified,
+	}, nil
+}
+
+// LoginWithGoogle handles Google Sign-In logic
+func (s *AuthService) LoginWithGoogle(req model.GoogleLoginRequest) (*model.LoginResponse, error) {
+	// 1. Verify ID Token
+	userInfo, err := s.verifyGoogleToken(req.IDToken)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Get or create user in DB
+	user, err := s.userRepo.GetOrCreateGoogleUser(*userInfo)
+	if err != nil {
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+
+	// 3. Generate JWT
+	token, err := s.jwtManager.GenerateToken(user.ID, user.Email, user.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	// 4. Mark user as online
+	_ = s.userRepo.UpdateOnlineStatus(user.ID, true)
+
+	return &model.LoginResponse{
+		Token: token,
+		User:  user.ToResponse(),
 	}, nil
 }
