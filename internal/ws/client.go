@@ -21,26 +21,26 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer
-	maxMessageSize = 4096
+	maxMessageSize = 512 * 1024 // 512 KB
 )
 
 // Client represents a single WebSocket connection
 type Client struct {
-	hub      *Hub
-	conn     *websocket.Conn
-	send     chan []byte
-	UserID   uuid.UUID
-	Name     string
+	hub    *Hub
+	conn   *websocket.Conn
+	send   chan []byte
+	UserID uuid.UUID
+	Name   string
 }
 
 // NewClient creates a new WebSocket client
 func NewClient(hub *Hub, conn *websocket.Conn, userID uuid.UUID, name string) *Client {
 	return &Client{
-		hub:      hub,
-		conn:     conn,
-		send:     make(chan []byte, 256),
-		UserID:   userID,
-		Name:     name,
+		hub:    hub,
+		conn:   conn,
+		send:   make(chan []byte, 256),
+		UserID: userID,
+		Name:   name,
 	}
 }
 

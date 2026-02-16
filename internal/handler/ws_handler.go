@@ -15,8 +15,8 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+	ReadBufferSize:  4096,
+	WriteBufferSize: 4096,
 	CheckOrigin: func(r *http.Request) bool {
 		return true // In production, validate origin
 	},
@@ -148,7 +148,7 @@ func (h *WSHandler) handleNewMessage(client *ws.Client, event model.WSEvent) {
 		Type:    model.WSEventNewMessage,
 		Payload: msg,
 	}
-	
+
 	log.Printf("📢 Broadcasting 'new_message' to %d members of conv %s", len(memberIDs), payload.ConversationID)
 	h.hub.SendToUsers(memberIDs, broadcastEvent)
 }
@@ -245,12 +245,14 @@ func (h *WSHandler) handleMessageRead(client *ws.Client, event model.WSEvent) {
 
 // handleCallSignaling forwards WebRTC signaling events to the target user
 func (h *WSHandler) handleCallSignaling(client *ws.Client, event model.WSEvent) {
+	log.Printf("📡 Signal: %s -> %s", event.Type, client.UserID)
+
 	payloadBytes, _ := json.Marshal(event.Payload)
 	var payload struct {
 		To uuid.UUID `json:"to"`
 	}
 	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-		log.Printf("Error parsing call signaling payload: %v", err)
+		log.Printf("❌ Error parsing signal payload: %v", err)
 		return
 	}
 

@@ -17,18 +17,18 @@ const redisChannel = "gotalk:messages"
 // It uses Redis Pub/Sub for horizontal scaling across multiple instances
 type Hub struct {
 	// Map of userID -> set of client connections (one user can have multiple tabs/devices)
-	clients    map[uuid.UUID]map[*Client]bool
-	mu         sync.RWMutex
+	clients map[uuid.UUID]map[*Client]bool
+	mu      sync.RWMutex
 
 	// Channels for registering/unregistering clients
 	register   chan *Client
 	unregister chan *Client
 
 	// Channel for broadcasting messages to local clients
-	broadcast  chan *model.WSEvent
+	broadcast chan *model.WSEvent
 
 	// Redis client for Pub/Sub (horizontal scaling)
-	rdb        *redis.Client
+	rdb *redis.Client
 
 	// Callback when user comes online/offline
 	onStatusChange func(userID uuid.UUID, online bool)
@@ -236,7 +236,7 @@ func (h *Hub) subscribeRedis(ctx context.Context) {
 	defer pubsub.Close()
 
 	ch := pubsub.Channel()
-	log.Println("📡 Redis Pub/Sub subscriber started")
+	log.Println("Redis Pub/Sub subscriber started")
 
 	for {
 		select {
@@ -244,17 +244,27 @@ func (h *Hub) subscribeRedis(ctx context.Context) {
 			return
 		case msg := <-ch:
 			var targeted TargetedEvent
+			// Try to unmarshal as TargetedEvent
 			if err := json.Unmarshal([]byte(msg.Payload), &targeted); err != nil {
 				log.Printf("Error unmarshaling Redis message: %v", err)
 				continue
 			}
 
-			if targeted.TargetUserID != uuid.Nil {
-				// Targeted event - send to specific user
-				h.sendToLocalUser(targeted.TargetUserID, targeted.Event)
-			} else if targeted.Event != nil {
-				// Broadcast event - send to all local clients
-				h.broadcastToLocal(targeted.Event)
+			// Check if it's a valid TargetedEvent wrapper
+			if targeted.Event != nil {
+				if targeted.TargetUserID != uuid.Nil {
+					// Targeted event - send to specific user
+					h.sendToLocalUser(targeted.TargetUserID, targeted.Event)
+				} else {
+					// Broadcast event wrapped in TargetedEvent (target_user_id is nil/empty)
+					h.broadcastToLocal(targeted.Event)
+				}
+			} else {
+				// Fallback: It might be a raw WSEvent (e.g. from addClient/removeClient)
+				var wsEvent model.WSEvent
+				if err := json.Unmarshal([]byte(msg.Payload), &wsEvent); err == nil && wsEvent.Type != "" {
+					h.broadcastToLocal(&wsEvent)
+				}
 			}
 		}
 	}
