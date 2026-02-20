@@ -3,16 +3,12 @@ name: 🚀 Build & Deploy GoTalk API
 on:
   push:
     branches:
-      - main        # Trigger deploy khi push lên main
-      - master      # Hoặc master tùy repo của bạn
-  workflow_dispatch: # Cho phép trigger thủ công từ GitHub UI
+      - main
+      - master
+  workflow_dispatch:
 
 env:
-  # Docker Hub image name - THAY bằng Docker Hub username của bạn
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/gotalk-api
-  # Namespace Kubernetes trên VPS
   K8S_NAMESPACE: gotalk
-  # Tên Deployment trên Kubernetes
   K8S_DEPLOYMENT: gotalk-api
 
 jobs:
@@ -24,15 +20,15 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
+      # Chỉ output image_tag (chuỗi thuần, không chứa secret)
+      # VD: v260220.5
       image_tag: ${{ steps.meta.outputs.version }}
-      full_image: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
 
     steps:
       - name: 📥 Checkout source code
         uses: actions/checkout@v4
 
-      # Tạo image tag theo format: v{YYMMDD}.{run_number} để dễ trace
-      # VD: v260220.5
+      # Tạo image tag theo format: v{YYMMDD}.{run_number}
       - name: 🏷️ Generate image tag
         id: meta
         run: |
@@ -47,7 +43,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Setup QEMU và Buildx để support multi-platform (optional nhưng tốt cho production)
       - name: 🛠️ Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -56,20 +51,18 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          # Build target "production" (stage 3 trong Dockerfile của bạn)
           target: production
           push: true
-          # Push 2 tags: version cụ thể + latest
+          # Dùng trực tiếp secret ở đây (trong cùng job) → KHÔNG bị mask
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-            ${{ env.IMAGE_NAME }}:latest
-          # Cache layers để build nhanh hơn ở lần sau
+            ${{ secrets.DOCKERHUB_USERNAME }}/gotalk-api:${{ steps.meta.outputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/gotalk-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: ✅ Image pushed successfully
         run: |
-          echo "🎉 Image pushed: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+          echo "🎉 Image pushed: ${{ secrets.DOCKERHUB_USERNAME }}/gotalk-api:${{ steps.meta.outputs.version }}"
 
   # ============================================================
   # JOB 2: Deploy lên VPS qua SSH (kubectl set image)
@@ -77,47 +70,47 @@ jobs:
   deploy:
     name: 🚀 Deploy to VPS (Kubernetes)
     runs-on: ubuntu-latest
-    needs: build-and-push  # Chỉ chạy sau khi build thành công
+    needs: build-and-push
 
     steps:
-      - name: 📥 Checkout source code
-        uses: actions/checkout@v4
-
-      - name: 🔗 SSH into VPS and deploy
+      - name:  SSH into VPS and deploy
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          # Dùng SSH private key (khuyên dùng) thay cho password
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          # Script chạy trực tiếp trên VPS
+          port: 22
+          # Truyền biến vào SSH session qua envs thay vì nội suy trong script
+          # → tránh bị GitHub mask do chứa secret value
+          envs: IMAGE_TAG,DOCKERHUB_USERNAME,K8S_NAMESPACE,K8S_DEPLOYMENT
           script: |
             set -e
 
-            NEW_IMAGE="${{ needs.build-and-push.outputs.full_image }}"
-            NAMESPACE="${{ env.K8S_NAMESPACE }}"
-            DEPLOYMENT="${{ env.K8S_DEPLOYMENT }}"
+            # Ghép image name từ envs được truyền vào SSH session
+            NEW_IMAGE="${DOCKERHUB_USERNAME}/gotalk-api:${IMAGE_TAG}"
 
             echo "🚀 Deploying: ${NEW_IMAGE}"
-            echo "📦 Namespace: ${NAMESPACE} | Deployment: ${DEPLOYMENT}"
+            echo "📦 Namespace: ${K8S_NAMESPACE} | Deployment: ${K8S_DEPLOYMENT}"
 
-            # Cập nhật image cho container "api" trong deployment
-            kubectl set image deployment/${DEPLOYMENT} \
+            kubectl set image deployment/${K8S_DEPLOYMENT} \
               api=${NEW_IMAGE} \
-              --namespace=${NAMESPACE}
+              --namespace=${K8S_NAMESPACE}
 
-            # Chờ rollout hoàn thành (timeout 3 phút)
             echo "⏳ Waiting for rollout to complete..."
-            kubectl rollout status deployment/${DEPLOYMENT} \
-              --namespace=${NAMESPACE} \
+            kubectl rollout status deployment/${K8S_DEPLOYMENT} \
+              --namespace=${K8S_NAMESPACE} \
               --timeout=180s
 
             echo "✅ Deployment successful!"
             echo "📋 Current pods:"
-            kubectl get pods --namespace=${NAMESPACE} -l app=${DEPLOYMENT}
+            kubectl get pods --namespace=${K8S_NAMESPACE} -l app=${K8S_DEPLOYMENT}
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          K8S_NAMESPACE: ${{ env.K8S_NAMESPACE }}
+          K8S_DEPLOYMENT: ${{ env.K8S_DEPLOYMENT }}
 
       - name: 🎉 Deploy completed
         run: |
-          echo "✅ GoTalk API deployed successfully!"
-          echo "🖼️ Image: ${{ needs.build-and-push.outputs.full_image }}"
+          echo "✅ GoTalk API deployed!"
+          echo "🖼️  Image tag: ${{ needs.build-and-push.outputs.image_tag }}"
