@@ -92,6 +92,26 @@ docker compose logs -f api
 curl http://api.localhost/health
 ```
 
+### 4. Database Migrations & Seeding
+
+Migrations run automatically when the API server starts (`go run cmd/server/main.go` or via Docker). 
+To populate the database with sample data (10 test users and 1 group chat), run the seeder:
+
+```bash
+# Run the database seeder locally
+go run cmd/seeder/main.go
+```
+
+**Running on Server (Kubernetes):**
+Since the server uses Docker containers, the seeder binary has been compiled directly into the production image. You can execute it via K8s:
+```bash
+kubectl exec -it deployment/gotalk-api -n gotalk -- ./seeder
+```
+
+**Test Accounts Created:**
+- **Emails:** `user1@gotalk.local` to `user10@gotalk.local`
+- **Password (for all):** `password123`
+
 ## 📡 API Endpoints
 
 ### Auth

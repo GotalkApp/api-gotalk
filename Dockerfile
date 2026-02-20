@@ -43,7 +43,8 @@ COPY . .
 # CGO_ENABLED=0: Statically linked binary (important for scratch/alpine)
 # -ldflags="-w -s": Strip debug symbols for smaller size
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o main ./cmd/server/main.go
-
+# Compile seeder binary as well
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o seeder ./cmd/seeder/main.go
 
 # Stage 3: Production (Minimal Image)
 FROM alpine:latest AS production
@@ -59,6 +60,7 @@ USER gotalk
 
 # Copy binary from builder
 COPY --from=builder /app/main .
+COPY --from=builder /app/seeder .
 # Copy migration files (if using file-based migration inside binary, this is optional, 
 # but if loading from disk, we need them. Here we use embed, so handled in binary)
 
