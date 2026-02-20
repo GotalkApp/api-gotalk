@@ -7,8 +7,8 @@
 # Use 'alpine' tag for latest stable Go version (currently 1.22+)
 FROM golang:alpine AS development
 
-# Install git required for fetching dependencies
-RUN apk add --no-cache git
+# Install git required for fetching dependencies and tzdata for timezones
+RUN apk add --no-cache git tzdata
 
 WORKDIR /app
 
@@ -50,8 +50,8 @@ FROM alpine:latest AS production
 
 WORKDIR /app
 
-# Install ca-certificates for HTTPS calls (e.g. to Google)
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates and tzdata for HTTPS calls and timezones
+RUN apk --no-cache add ca-certificates tzdata
 
 # Create non-root user for security
 RUN addgroup -S gotalk && adduser -S gotalk -G gotalk
