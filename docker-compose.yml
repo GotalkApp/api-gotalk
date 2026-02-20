@@ -140,7 +140,7 @@ services:
       - "9000:9000" # API
       - "9001:9001" # Console
     volumes:
-      - minio_data:/data
+      - ./storages:/data
     command: server /data --console-address ":9001"
     labels:
       - "traefik.enable=true"
@@ -156,8 +156,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  minio_data:
     driver: local
   go-modules:
     driver: local

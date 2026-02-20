@@ -1,0 +1,123 @@
+name: 🚀 Build & Deploy GoTalk API
+
+on:
+  push:
+    branches:
+      - main        # Trigger deploy khi push lên main
+      - master      # Hoặc master tùy repo của bạn
+  workflow_dispatch: # Cho phép trigger thủ công từ GitHub UI
+
+env:
+  # Docker Hub image name - THAY bằng Docker Hub username của bạn
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/gotalk-api
+  # Namespace Kubernetes trên VPS
+  K8S_NAMESPACE: gotalk
+  # Tên Deployment trên Kubernetes
+  K8S_DEPLOYMENT: gotalk-api
+
+jobs:
+  # ============================================================
+  # JOB 1: Build & Push Docker Image lên Docker Hub
+  # ============================================================
+  build-and-push:
+    name: 🐳 Build & Push Docker Image
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      full_image: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: 📥 Checkout source code
+        uses: actions/checkout@v4
+
+      # Tạo image tag theo format: v{YYMMDD}.{run_number} để dễ trace
+      # VD: v260220.5
+      - name: 🏷️ Generate image tag
+        id: meta
+        run: |
+          DATE=$(date +'%y%m%d')
+          TAG="v${DATE}.${{ github.run_number }}"
+          echo "version=${TAG}" >> $GITHUB_OUTPUT
+          echo "📦 Image tag: ${TAG}"
+
+      - name: 🔐 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Setup QEMU và Buildx để support multi-platform (optional nhưng tốt cho production)
+      - name: 🛠️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏗️ Build and Push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          # Build target "production" (stage 3 trong Dockerfile của bạn)
+          target: production
+          push: true
+          # Push 2 tags: version cụ thể + latest
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+            ${{ env.IMAGE_NAME }}:latest
+          # Cache layers để build nhanh hơn ở lần sau
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: ✅ Image pushed successfully
+        run: |
+          echo "🎉 Image pushed: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+
+  # ============================================================
+  # JOB 2: Deploy lên VPS qua SSH (kubectl set image)
+  # ============================================================
+  deploy:
+    name: 🚀 Deploy to VPS (Kubernetes)
+    runs-on: ubuntu-latest
+    needs: build-and-push  # Chỉ chạy sau khi build thành công
+
+    steps:
+      - name: 📥 Checkout source code
+        uses: actions/checkout@v4
+
+      - name: 🔗 SSH into VPS and deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          # Dùng SSH private key (khuyên dùng) thay cho password
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          # Script chạy trực tiếp trên VPS
+          script: |
+            set -e
+
+            NEW_IMAGE="${{ needs.build-and-push.outputs.full_image }}"
+            NAMESPACE="${{ env.K8S_NAMESPACE }}"
+            DEPLOYMENT="${{ env.K8S_DEPLOYMENT }}"
+
+            echo "🚀 Deploying: ${NEW_IMAGE}"
+            echo "📦 Namespace: ${NAMESPACE} | Deployment: ${DEPLOYMENT}"
+
+            # Cập nhật image cho container "api" trong deployment
+            kubectl set image deployment/${DEPLOYMENT} \
+              api=${NEW_IMAGE} \
+              --namespace=${NAMESPACE}
+
+            # Chờ rollout hoàn thành (timeout 3 phút)
+            echo "⏳ Waiting for rollout to complete..."
+            kubectl rollout status deployment/${DEPLOYMENT} \
+              --namespace=${NAMESPACE} \
+              --timeout=180s
+
+            echo "✅ Deployment successful!"
+            echo "📋 Current pods:"
+            kubectl get pods --namespace=${NAMESPACE} -l app=${DEPLOYMENT}
+
+      - name: 🎉 Deploy completed
+        run: |
+          echo "✅ GoTalk API deployed successfully!"
+          echo "🖼️ Image: ${{ needs.build-and-push.outputs.full_image }}"
